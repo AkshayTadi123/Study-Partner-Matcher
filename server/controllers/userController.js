@@ -15,7 +15,7 @@ const signupUser = async (req, res) => {
   try {
     const user = await User.signup(userName, password, profileImage);
     const token = createToken(user._id);
-    res.status(200).json({ userName, token });
+    res.status(200).json({ _id: user._id, userName, profileImage: user.profileImage, token });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
@@ -34,6 +34,7 @@ const loginUser = async (req, res) => {
 
     // Send the response with user data and token
     res.status(200).json({
+      _id: user._id,
       userName: user.userName,
       profileImage: user.profileImage,
       firstName: user.firstName,

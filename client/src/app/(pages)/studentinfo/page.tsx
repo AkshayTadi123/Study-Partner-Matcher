@@ -1,82 +1,85 @@
 "use client";
 import { useRouter } from "next/navigation";
 import React, { useState } from "react";
-import { Calendar } from "@/components/ui/calendar"; // Assuming the Calendar component is correctly imported
+import { Calendar } from "@/components/ui/calendar";
+import { api } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 
-type TimeBlock = {
-  start: Date;
-  end: Date;
-};
+type TimeBlock = { start: Date; end: Date };
 
 const StudentInfoPage = () => {
-
   const router = useRouter();
-  const navigateTo = (page: string) => {
-    router.push(`http://localhost:3000/${page}`);
-  };
+  const { user } = useAuth();
 
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [dates, setDates] = useState<TimeBlock[]>([]);
-  const [courses, setCourses] = useState<string | null>(null);
-  const [courseInput, setCourseInput] = useState<string>("");
-  const [startTime, setStartTime] = useState<string>("");
-  const [endTime, setEndTime] = useState<string>("");
-  const [studyHabit, setStudyHabit] = useState<string>("");
+  const [courseInput, setCourseInput] = useState("");
+  const [course, setCourse] = useState<string | null>(null);
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
+  const [studyHabit, setStudyHabit] = useState("");
   const [studyHabits, setStudyHabits] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const handleCourseOnClick = () => {
-    if (courseInput && !courses) {
-      setCourses(courseInput);
-      setCourseInput("");
-    }
-  };
-
-  const handleRemoveCourse = () => {
-    setCourses(null);
-  };
-
-  const handleDateOnClick = () => {
-    const startDate = convertToDate(startTime);
-    const endDate = convertToDate(endTime);
-    setDates([...dates, { start: startDate, end: endDate }]);
-  };
-
-  const convertToDate = (timeString: string) => {
+  const convertToDate = (timeString: string): Date => {
     const date = new Date(selectedDate!.getTime());
-    const [time, modifier] = timeString.split(" ");
-    let [hours, minutes] = time.split(":").map(Number);
-
-    if (modifier === "PM" && hours !== 12) {
-      hours += 12;
-    } else if (modifier === "AM" && hours === 12) {
-      hours = 0;
-    }
-
+    const [hours, minutes] = timeString.split(":").map(Number);
     date.setHours(hours, minutes, 0, 0);
     return date;
   };
 
+  const handleAddTimeBlock = () => {
+    if (!startTime || !endTime) return;
+    setDates([...dates, { start: convertToDate(startTime), end: convertToDate(endTime) }]);
+    setStartTime("");
+    setEndTime("");
+  };
+
   const handleStudyHabitEnter = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && studyHabit) {
-      setStudyHabits((prev) => [...prev, studyHabit]);
+    if (e.key === "Enter" && studyHabit.trim()) {
+      setStudyHabits((prev) => [...prev, studyHabit.trim()]);
       setStudyHabit("");
     }
   };
 
-  const handleSubmit = () => {
-    const dataToSend = {
-      course: courses,
-      dates: dates,
-      studyHabits: studyHabits,
-    };
-    console.log("Data sent to the database:", dataToSend);
+  const handleSubmit = async () => {
+    if (!user) { router.push("/login"); return; }
+    if (!course) { setError("Please add a course."); return; }
+    if (dates.length === 0) { setError("Please add at least one time block."); return; }
 
-    setCourses(null);
-    setDates([]);
-    setStudyHabits([]);
-    setStartTime("");
-    setEndTime("");
-    setCourseInput("");
+    setError(null);
+    setLoading(true);
+    try {
+      // Ensure the course exists (create if it doesn't)
+      let courseDoc: { _id: string };
+      const courses = await api.get<{ _id: string; courseCode: string }[]>("/api/course");
+      const existing = courses.find(c => c.courseCode === course);
+
+      if (existing) {
+        courseDoc = existing;
+      } else {
+        courseDoc = await api.post<{ _id: string }>("/api/course", { courseCode: course });
+      }
+
+      if (!user._id) throw new Error("User ID not found. Please log in again.");
+
+      await api.post("/api/course/addStudent", {
+        courseID: courseDoc._id,
+        userID: user._id,
+      });
+
+      await api.patch(`/api/user/${user._id}`, {
+        timeIntervals: dates,
+        studyHabits: studyHabits.join(", "),
+      });
+
+      router.push("/matching-students");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Submission failed");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -86,26 +89,26 @@ const StudentInfoPage = () => {
           Weekly Study Information
         </h1>
 
-        {/* Course Input Section */}
+        {error && <p className="mb-4 text-sm text-red-600 text-center">{error}</p>}
+
+        {/* Course Input */}
         <div className="flex items-center mb-6">
           <label className="text-lg text-gray-800 w-1/3">Course</label>
           <input
             value={courseInput}
             onChange={(e) => setCourseInput(e.target.value)}
             className="rounded-md border-2 border-gray-300 p-2 flex-grow"
-            placeholder="Enter course name"
+            placeholder="Enter course code (e.g. EECS3101)"
           />
           <button
-            onClick={courses ? handleRemoveCourse : handleCourseOnClick}
-            className={`ml-4 px-4 py-2 rounded-md ${
-              courses ? "bg-red-500" : "bg-blue-500"
-            } text-white`}
+            onClick={course ? () => setCourse(null) : () => { if (courseInput) { setCourse(courseInput); setCourseInput(""); } }}
+            className={`ml-4 px-4 py-2 rounded-md ${course ? "bg-red-500" : "bg-blue-500"} text-white`}
           >
-            {courses ? "Remove" : "Add"}
+            {course ? "Remove" : "Add"}
           </button>
         </div>
-        {courses && (
-          <p className="text-gray-600 text-center mb-6">Current Course: {courses}</p>
+        {course && (
+          <p className="text-gray-600 text-center mb-6">Current Course: {course}</p>
         )}
 
         {/* Calendar and Time Block */}
@@ -135,7 +138,7 @@ const StudentInfoPage = () => {
               className="rounded-md border-2 border-gray-300 p-2 w-full mb-4"
             />
             <button
-              onClick={handleDateOnClick}
+              onClick={handleAddTimeBlock}
               className="bg-blue-500 text-white px-6 py-2 rounded-md"
             >
               Add Time Block
@@ -143,19 +146,18 @@ const StudentInfoPage = () => {
           </div>
         </div>
 
-        {/* Display Added Time Blocks */}
         {dates.length > 0 && (
           <div className="mb-8 text-center">
             <h3 className="text-lg font-semibold text-gray-800">Added Time Blocks</h3>
-            {dates.map((date, index) => (
-              <p key={index} className="text-gray-700">
-                From: {date.start.toLocaleString()} To: {date.end.toLocaleString()}
+            {dates.map((d, i) => (
+              <p key={i} className="text-gray-700">
+                {d.start.toLocaleString()} → {d.end.toLocaleString()}
               </p>
             ))}
           </div>
         )}
 
-        {/* Study Habits Section */}
+        {/* Study Habits */}
         <div className="mb-8">
           <h2 className="text-lg font-medium text-gray-800 mb-2">Study Habits</h2>
           <input
@@ -163,23 +165,21 @@ const StudentInfoPage = () => {
             onChange={(e) => setStudyHabit(e.target.value)}
             onKeyDown={handleStudyHabitEnter}
             className="rounded-md border-2 border-gray-300 p-2 w-full mb-4"
-            placeholder="Enter study habit and press Enter"
+            placeholder="Enter a study habit and press Enter"
           />
           {studyHabits.length > 0 && (
             <ul className="list-disc list-inside text-gray-600 ml-4">
-              {studyHabits.map((habit, index) => (
-                <li key={index}>{habit}</li>
-              ))}
+              {studyHabits.map((h, i) => <li key={i}>{h}</li>)}
             </ul>
           )}
         </div>
 
-        {/* Submit Button */}
         <button
-          onClick={() => navigateTo("matching-students")}
-          className="w-full bg-green-500 text-white py-3 rounded-md text-xl"
+          onClick={handleSubmit}
+          disabled={loading}
+          className="w-full bg-green-500 text-white py-3 rounded-md text-xl disabled:opacity-50"
         >
-          Submit
+          {loading ? "Submitting..." : "Submit & Find Matches"}
         </button>
       </div>
     </div>

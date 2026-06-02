@@ -12,7 +12,7 @@ const UserMatchingPage = () => {
   // Use Next.js router to navigate
   const router = useRouter();
   const navigateTo = (page: string) => {
-    router.push(`http://localhost:3000/${page}`);
+    router.push(`/${page}`);
   };
   // Dummy data for the profile
   const user = {
