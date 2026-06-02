@@ -7,30 +7,17 @@ const createToken = (_id) => {
 
 const signupUser = async (req, res) => {
   const { userName, password, profileImage } = req.body;
-  // const profileImage = req.files?.profileImage;  // Capture profile image from request
 
-  // Debugging logs
-  console.log("Received userName:", userName);
-  console.log("Received password:", password);
-  console.log("Received profileImage:", profileImage);
-
-  // Validation to ensure userName, password, and profileImage are provided
   if (!userName || !password || !profileImage) {
     return res.status(400).json({ error: 'All fields must be filled, including profileImage.' });
   }
 
   try {
-    // If profile image is provided, capture and store it as a Buffer
-    // const profileImageBuffer = profileImage.data; // Store image as a buffer
     const user = await User.signup(userName, password, profileImage);
-    // console.log("After sign up")
-    // Create a token
     const token = createToken(user._id);
     res.status(200).json({ userName, token });
   } catch (error) {
-    console.error(error); // Log the error
-    // res.status(400).json({ error: error.message });
-    res.status(400).json({error: error.message});
+    res.status(400).json({ error: error.message });
   }
 };
 
@@ -110,19 +97,10 @@ const updateUser = async (req, res) => {
   // const profileImage = req.files?.profileImage;  // Optional: Capture profile image if provided
 
   try {
-    let user = await User.findById(id).populate('courses');
+    const user = await User.findByIdAndUpdate(id, updates, { new: true, runValidators: true }).populate('courses');
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
-    // Update user fields
-    user = await User.findByIdAndUpdate(id, updates, { new: true }).populate('courses');
-
-    // If profile image is provided, update it
-    // if (profileImage) {
-    //   user.profileImage = profileImage.data;  // Save binary data as Buffer
-    //   await user.save();
-    // }
-
     res.status(200).json(user);
   } catch (error) {
     res.status(400).json({ error: error.message });

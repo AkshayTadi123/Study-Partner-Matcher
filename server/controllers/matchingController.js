@@ -2,7 +2,11 @@ const { OpenAI } = require('openai');
 const Course = require('../models/courseModel');
 const User = require('../models/userModel');
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+let _openai;
+const getOpenAI = () => {
+  if (!_openai) _openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  return _openai;
+};
 
 function findOverlap(intervals1, intervals2) {
   for (const a of intervals1) {
@@ -43,7 +47,7 @@ Add random fluctuation so the result is not round. Return only the number.
 User 1: ${referenceStudent.studyHabits}
 User 2: ${student.studyHabits}`;
 
-        const response = await openai.chat.completions.create({
+        const response = await getOpenAI().chat.completions.create({
           model: 'gpt-4o-mini',
           messages: [{ role: 'user', content: prompt }],
         });
