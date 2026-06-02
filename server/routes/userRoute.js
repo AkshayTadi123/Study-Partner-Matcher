@@ -5,29 +5,18 @@ const {
   getAllUsers,
   getUserById,
   removeUser,
-  updateUser
+  updateUser,
 } = require('../controllers/userController');
+const requireAuth = require('../middleware/requireAuth');
 
 const router = express.Router();
 
-// Define routes for user operations
-
-// Signup route
 router.post('/signup', signupUser);
-
-// Login route
 router.post('/login', loginUser);
 
-// Get all users
-router.get('/', getAllUsers);
-
-// Get a single user by ID
-router.get('/:id', getUserById);
-
-// Remove a user by ID
-router.delete('/:id', removeUser);
-
-// Update user info
-router.patch('/:id', updateUser);
+router.get('/', requireAuth, getAllUsers);
+router.get('/:id', requireAuth, getUserById);
+router.delete('/:id', requireAuth, removeUser);
+router.patch('/:id', requireAuth, updateUser);
 
 module.exports = router;

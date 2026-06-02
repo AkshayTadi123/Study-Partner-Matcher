@@ -114,12 +114,11 @@ const addStudentToCourse = async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // Add user to the course's students list
-    if (!course.students.includes(userID)) {
+    const alreadyEnrolled = course.students.some(id => id.toString() === userID);
+    if (!alreadyEnrolled) {
       course.students.push(userID);
       await course.save();
 
-      // Add the course to the user's list of courses
       user.courses.push(courseID);
       await user.save();
 
@@ -148,17 +147,15 @@ const removeStudentFromCourse = async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // Check if the student is enrolled in the course
-    if (!course.students.includes(userID)) {
+    const isEnrolled = course.students.some(id => id.toString() === userID);
+    if (!isEnrolled) {
       return res.status(400).json({ error: 'Student is not enrolled in this course' });
     }
 
-    // Remove user from the course's students list
-    course.students = course.students.filter(studentId => studentId.toString() !== userID);
+    course.students = course.students.filter(id => id.toString() !== userID);
     await course.save();
 
-    // Remove the course from the user's list of courses
-    user.courses = user.courses.filter(courseId => courseId.toString() !== courseID);
+    user.courses = user.courses.filter(id => id.toString() !== courseID);
     await user.save();
 
     res.status(200).json({ message: 'Student removed from course successfully' });
